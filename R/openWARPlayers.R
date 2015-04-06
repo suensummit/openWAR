@@ -23,9 +23,17 @@ setClass("openWARPlayers", contains = "data.frame")
 #' war <- getWAR(out$openWARPlays)
 #' summary(war)
 
-summary.openWARPlayers = function (data, n = 25, ...) {
-  cat(paste("Displaying information for", nrow(data), "players, of whom", nrow(subset(data, RAA.pitch != 0)), "have pitched\n"))
-  head(data[order(data$WAR, decreasing=TRUE), c("Name", "TPA", "WAR", "RAA", "repl", "RAA.bat", "RAA.br", "RAA.field", "RAA.pitch")], n)
+summary.openWARPlayers = function (data, n = 25, ...) {  
+  cat(paste("Displaying information for", nrow(data), "players, of whom", nrow(filter(data, RAA.pitch != 0)), "have pitched\n"))
+  
+  # classic syntax
+  # head(data[order(data$WAR, decreasing=TRUE), c("Name", "TPA", "WAR", "RAA", "repl", "RAA.bat", "RAA.br", "RAA.field", "RAA.pitch")], n)
+  
+  # dplyr syntax
+  data %>%
+    dplyr::select(Name, TPA, WAR, RAA, repl, RAA.bat, RAA.br, RAA.field, RAA.pitch) %>%
+    arrange(desc(WAR)) %>%
+    head(n)
 }
 
 
@@ -58,13 +66,15 @@ plot.openWARPlayers = function (data, ...) {
   names(supp) = c("playerId", "Name", "WAR", "TPA", "repl", "RAA", "RAA_pitch")
   
   require(mosaic)
-  xyplot(RAA ~ TPA, groups=isReplacement, data=data, panel=panel.war, data2 = supp
+  p = xyplot(RAA ~ TPA, groups=isReplacement, data=data, panel=panel.war, data2 = supp
          , alpha = 0.3, pch = 19, type = c("p", "r")
+         , par.settings = list("superpose.symbol" = list(pch = 19))
          , ylab = "openWAR Runs Above Average", xlab = "Playing Time (plate appearances plus batters faced)"
          , auto.key = list(columns = 2, corner = c(0.05,0.95), text = c("MLB Player", "Replacement Player"))
          , sub = paste("Number of Players =", nrow(data), ", Number of Replacement Level Players =", sum(data$isReplacement))
          , ...
   )
+  print(p)
 }
 
 #' @title panel.war
@@ -139,12 +149,25 @@ panel.war = function (x, y, ...) {
 #' summary(sim)
 
 summary.do.openWARPlayers = function (data, n = 25, ...) {
-  require(plyr)  
-  players = ddply(data, ~Name, summarise, q0 = min(WAR), q2.5 = quantile(WAR, 0.025)
-                  , q25 = quantile(WAR, 0.25)
-                  , q50 = mean(WAR)
-                  , q75 = quantile(WAR, 0.75), q97.5 = quantile(WAR, 0.975), q100 = max(WAR))
-  print(head(players[order(players$q50, decreasing=TRUE),], n))
+#   require(plyr)  
+#   players = ddply(data, ~Name, summarise, q0 = min(WAR), q2.5 = quantile(WAR, 0.025)
+#                   , q25 = quantile(WAR, 0.25)
+#                   , q50 = mean(WAR)
+#                   , q75 = quantile(WAR, 0.75), q97.5 = quantile(WAR, 0.975), q100 = max(WAR))
+#   print(head(players[order(players$q50, decreasing=TRUE),], n))
+  
+  data %>%
+    dplyr::select(Name, WAR) %>%
+    group_by(Name) %>%
+    summarise(q0 = min(WAR)
+              , q2.5 = quantile(WAR, 0.025)
+              , q25 = quantile(WAR, 0.25)
+              , q50 = mean(WAR)
+              , q75 = quantile(WAR, 0.75)
+              , q97.5 = quantile(WAR, 0.975)
+              , q100 = max(WAR)) %>%
+    arrange(desc(q50)) %>%
+    head(n)
 }
 
 
@@ -174,7 +197,7 @@ plot.do.openWARPlayers = function (data, playerIds = c(431151, 285079), ...) {
   require(mosaic)
   playerIds = sort(playerIds)
   # is it worth the trouble to filter the rows? 
-  rows = subset(data, batterId %in% playerIds)
+  rows = filter(data, batterId %in% playerIds)
   # Remove unused factor levels
   rows$Name = factor(rows$Name)
   

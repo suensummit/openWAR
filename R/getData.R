@@ -5,7 +5,7 @@
 #' @details Given a beginning and end date, this function will retrieve all data from the MLABM
 #' GameDay server in the specified interval and process them into a single data.frame. 
 #' 
-#' @param start A valid date in yyyy-mm-dd format (default today)
+#' @param start A valid date in yyyy-mm-dd format (default yesterday)
 #' @param end A valid date in yyyy-mm-dd format (default start)
 #' @param drop.suspended Logical indicating whether games with fewer than 5 innings should be excluded
 #' 
@@ -40,12 +40,13 @@ getData <- function(start = Sys.Date()-1, end = NULL, gameIds = NULL, drop.suspe
   #}
   ds.list = lapply(gd.list, "[[", "ds")
   out = do.call(rbind, ds.list)
-  out = subset(out, game_type == "R")
+  out = filter(out, game_type == "R")
   # exclude suspended games
   if (drop.suspended) {
-    test = ddply(out, ~gameId, summarise, Innings = max(inning))
-    suspended = subset(test, Innings < 5)$gameId
-    out = subset(out, !gameId %in% suspended)
+#    test = ddply(out, ~gameId, summarise, Innings = max(inning))
+    test <- summarise(group_by(out, gameId), Innings = max(inning))
+    suspended = filter(test, Innings < 5)$gameId
+    out = filter(out, !gameId %in% suspended)
   }
   
   # Set the class attribute
